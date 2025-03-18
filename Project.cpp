@@ -113,7 +113,8 @@ public:
     }
 
     // Function to log in a user
-    void login() {
+    void login()
+     {
         if(x)
         {
         system("CLS");
@@ -138,7 +139,7 @@ public:
             city = storedCity;
             if (storedUser == username && storedPass == password) {
                 loginSuccess = true;
-                break;
+               // break;
             }
         }
         file.close();
@@ -148,6 +149,7 @@ public:
             cout << "Login successful! Welcome, " << username << ".\n";
             cout << "Your registered city is: " <<city  << ".\n";
             loggedin = 1;
+            //break;
         }
          else
          {
