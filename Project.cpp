@@ -171,14 +171,18 @@ public:
         cout << "3.bill\n";
         cout << "4.exit\n";
         cout << "********************\n";
-        cout << "Enter your choice (1-4) : " ;
-        cin >> choice;
-        switch (choice) {
-            case 1:bookticket(); break;
-            case 2:;break;
-            case 3:; break;
-            case 4:; break;
-            default: cout << "Invalid choice! Try again.\n";
+        while(true)
+        {
+            cout << "Enter your choice (1-4) : " ;
+            cin >> choice;
+            switch (choice) 
+            {
+                case 1:bookticket(); break;
+                case 2:;break;
+                case 3:; break;
+                case 4: exit(0);
+                default: cout << "Invalid choice! Try again.\n";continue;
+            }
         }
     }
 
@@ -198,17 +202,20 @@ public:
         cout << "6.Captain America : Brave New World\n";
         cout << "********************\n";
         cout << "If you want go previous page enter 0.\n";
-        cout << "Enter your choice (0-6) : " ;
-        cin >> choice;
-        switch (choice) {
-            case 0:homepage(); break;
-            case 1:movie1(); break;
-            case 2:movie2();break;
-            case 3:movie3(); break;
-            case 4:movie4(); break;
-            case 5:movie5(); break;
-            case 6:movie6(); break;
-            default: cout << "Invalid choice! Try again.\n";
+        while(true)
+        {
+            cout << "Enter your choice (0-6) : " ;
+            cin >> choice;
+            switch (choice) {
+                case 0:homepage(); break;
+                case 1:movie1(); break;
+                case 2:movie2();break;
+                case 3:movie3(); break;
+                case 4:movie4(); break;
+                case 5:movie5(); break;
+                case 6:movie6(); break;
+                default: cout << "Invalid choice! Try again.\n";continue;
+            }
         }
     }
 
@@ -235,12 +242,12 @@ public:
             }
             else if(choice==1)
             {
-                show1();
+                //show1();
                 break;
             }
             else{
                 cout << "Invalid input! Please enter a number.\n";
-                cout << "Please,Enter 1 for book ticket : ";
+                cout << "Please,Enter Valid Input (0/1) : ";
 
                 continue;
             }
@@ -272,11 +279,10 @@ public:
         
     }
 
-    void show1()
-    {
-        
-    }
+    
 };
+
+
 
 // Main menu
 int main() {
