@@ -1,13 +1,14 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <conio.h> // For getch() on Windows
+#include <conio.h>  //For getch() on Windows
 #include<stdlib.h>
 
 using namespace std;
 static int x=1;
 static int b=1;
-class User {
+class User 
+{
 private:
     string username;
     string password;
@@ -17,15 +18,18 @@ private:
     string cities[5] = {"Ahmedabad", "Surat", "Nadiad", "Vadodara", "Rajkot"};
 
     // Function to check if username already exists
-    bool userExists(const string& user) {
+    bool userExists(const string& user)
+     {
         ifstream file("users.txt");
         if (!file) return false;  // File does not exist yet
 
         string storedUser, storedPass, storedCity;
-        while (file >> storedUser >> storedPass) {
+        while (file >> storedUser >> storedPass) 
+        {
             file.ignore();
             getline(file, storedCity);
-            if (storedUser == user) {
+            if (storedUser == user) 
+            {
                 return true;
             }
         }
@@ -33,17 +37,21 @@ private:
     }
 
     // Function to take hidden password input
-    string getPassword() {
+    string getPassword() 
+    {
         string pass;
         char ch;
         cout << "Enter password: ";
         while (true) {
             ch = _getch();
             if (ch == '\r') break;  // Enter key pressed
-            if (ch == '\b' && !pass.empty()) {  // Handle backspace
+            if (ch == '\b' && !pass.empty())
+             {  // Handle backspace
                 pass.pop_back();
                 cout << "\b \b";  // Move cursor back, erase *, move back again
-            } else if (ch != '\b') {
+            }
+             else if (ch != '\b') 
+             {
                 pass.push_back(ch);
                 cout << '*';
             }
@@ -54,7 +62,8 @@ private:
 
 public:
     // Function to display city options
-    void displayCities() {
+    void displayCities() 
+    {
         cout << "Select your city:\n";
         for (int i = 0; i < 5; i++) {
             cout << i + 1 << ". " << cities[i] << endl;
@@ -62,7 +71,8 @@ public:
     }
      
     // Function to sign up a new user
-    void signUp() {
+    void signUp() 
+    {
         
 
         while(true)
@@ -89,7 +99,8 @@ public:
         int choice;
         cout << "Enter your choice (1-5): ";
         
-        while (!(cin >> choice) || choice < 1 || choice > 5) {  // Input validation
+        while (!(cin >> choice) || choice < 1 || choice > 5) 
+        {  // Input validation
             cout << "Invalid input! Please enter a number between 1 and 5: ";
             cin.clear();
             cin.ignore(1000, '\n');
@@ -98,7 +109,8 @@ public:
         city = cities[choice - 1];
 
         ofstream file("users.txt", ios::app);
-        if (!file) {
+        if (!file) 
+        {
             cout << "Error opening file!\n";
             return;
         }
@@ -123,7 +135,8 @@ public:
         cin >> username;
        
         ifstream file("users.txt");
-        if (!file) {
+        if (!file) 
+        {
             cout << "No users found! Please sign up first.\n";
             return;
         }
@@ -133,18 +146,21 @@ public:
         string storedUser, storedPass, storedCity;
         bool loginSuccess = false;
 
-        while (file >> storedUser >> storedPass) {
+        while (file >> storedUser >> storedPass) 
+        {
             file.ignore();
             getline(file, storedCity);
             city = storedCity;
-            if (storedUser == username && storedPass == password) {
+            if (storedUser == username && storedPass == password) 
+            {
                 loginSuccess = true;
                // break;
             }
         }
         file.close();
         
-        if (loginSuccess) {
+        if (loginSuccess)
+         {
             system("CLS");
             cout << "Login successful! Welcome, " << username << ".\n";
             cout << "Your registered city is: " <<city  << ".\n";
@@ -209,7 +225,7 @@ public:
             switch (choice) {
                 case 0:homepage(); break;
                 case 1:movie1(); break;
-                case 2:movie2();break;
+                case 2:movie2(); break;
                 case 3:movie3(); break;
                 case 4:movie4(); break;
                 case 5:movie5(); break;
@@ -285,11 +301,13 @@ public:
 
 
 // Main menu
-int main() {
+int main()
+ {
     User user;
     int choice;
     //system("CLS");
-    while (b) {
+    while (b)
+     {
         if(user.Loggedin()) break;
         cout << "\n\n|| If you are a new user, please sign up first! ||"; 
         cout << "\n********************\n";
@@ -298,7 +316,8 @@ int main() {
         cout << "Enter your choice: ";
         
 
-        if (!(cin >> choice)) {
+        if (!(cin >> choice)) 
+        {
 
             cin.clear();
             cin.ignore(1000, '\n');
@@ -306,7 +325,8 @@ int main() {
             continue;
         }
 
-        switch (choice) {
+        switch (choice) 
+        {
             case 1: user.signUp(); break;
             case 2: user.login();break;
             case 3: cout << "Exiting program...\n"; return 0;
