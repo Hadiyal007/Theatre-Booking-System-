@@ -26,6 +26,7 @@ private:
         "Chhava", "Bahubali 2", "Pushpa 2", 
         "KGF 2", "Avengers Endgame", "Captain America: Brave New World"
     };
+    //void loadUserBookings();
 
     bool userExists(const string& user) {
         ifstream file("users.txt");
@@ -239,6 +240,11 @@ public:
     }
 
     void homepage() {
+        // Load the first movie by default when entering homepage
+        if (!currentMovie.empty()) {
+            loadSeatsForMovie(currentMovie);
+        }
+    
         while (true) {
             system("CLS");
             cout << "\n***** Movie Ticket Booking System *****\n";
@@ -247,18 +253,53 @@ public:
             cout << "3. View Booking Summary\n";
             cout << "4. Logout\n";
             cout << "***************************************\n";
-
+    
             int choice;
             cout << "Enter your choice (1-4): ";
             cin >> choice;
-
+    
             switch (choice) {
-                case 1: bookTicketMenu(); break;
-                case 2: removeTicketMenu(); break;
-                case 3: displayBill(); break;
-                case 4: return;
-                default: cout << "Invalid choice! Try again.\n";
+                case 1: 
+                    bookTicketMenu(); 
+                    break;
+                case 2: 
+                    // Load user's bookings before showing remove ticket menu
+                    loadUserBookings();
+                    removeTicketMenu(); 
+                    break;
+                case 3: 
+                    displayBill(); 
+                    break;
+                case 4: 
+                    return;
+                default: 
+                    cout << "Invalid choice! Try again.\n";
             }
+        }
+    }
+
+    void loadUserBookings() {
+        ifstream bookingFile("bookings.txt");
+        if (!bookingFile) return;
+    
+        string line;
+        while (getline(bookingFile, line)) {
+            istringstream iss(line);
+            string user, movie;
+            iss >> user >> movie;
+            
+            if (user == username) {
+                currentMovie = movie;
+                loadSeatsForMovie(currentMovie);
+                break;
+            }
+        }
+        bookingFile.close();
+    
+        if (currentMovie.empty()) {
+            cout << "No bookings found for this user.\n";
+            cout << "Press any key to continue...";
+            _getch();
         }
     }
 
@@ -377,6 +418,13 @@ public:
         }
     }
     void removeTicketMenu() {
+        if (currentMovie.empty()) {
+            cout << "You don't have any bookings to cancel.\n";
+            cout << "Press any key to continue...";
+            _getch();
+            return;
+        }
+    
         while (true) {
             system("CLS");
             showSeatingLayout();
@@ -387,16 +435,12 @@ public:
     
             if (seatLabel == "0") return;
             
-            // Store the current state to check if the seat was actually booked
             int row = toupper(seatLabel[0]) - 'A';
             int seat = stoi(seatLabel.substr(1)) - 1;
             int seatIndex = row * seatsPerRow + seat;
             bool wasBooked = bookedSeats[seatIndex];
             
-            removeTicket(seatLabel);
-            
-            // Only refresh if the seat was actually booked and now removed
-            if (wasBooked && !bookedSeats[seatIndex]) {
+            if (removeTicket(seatLabel)) {
                 system("CLS");
                 showSeatingLayout();
                 cout << "Seat " << seatLabel << " has been successfully canceled.\n";
