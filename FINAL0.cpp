@@ -522,13 +522,13 @@ public:
             }
             cout << "\n";
             cout << "  Tickets: " << booking.second.size() << "\n";
-            cout << "  Amount: ₹" << fixed << setprecision(2) 
+            cout << "  Amount: Rs." << fixed << setprecision(2) 
                  << (booking.second.size() * TICKET_PRICE) << "\n";
             cout << "--------------------------------------------\n";
         }
         
         // Display total
-        cout << "  TOTAL AMOUNT: ₹" << fixed << setprecision(2) << totalAmount << "\n";
+        cout << "  TOTAL AMOUNT: Rs." << fixed << setprecision(2) << totalAmount << "\n";
         cout << "============================================\n";
         
         cout << "\nPress any key to view payment options...";
@@ -557,11 +557,11 @@ public:
                 break;
             case 2: 
                 paymentMethod = "Debit/Credit Card";
-                cout << "\nCard payment selected for ₹" << totalAmount << "\n";
+                cout << "\nCard payment selected for Rupees" << totalAmount << "\n";
                 break;
             case 3: 
                 paymentMethod = "Online Payment";
-                cout << "\nOnline payment selected for ₹" << totalAmount << "\n";
+                cout << "\nOnline payment selected for Rupees" << totalAmount << "\n";
                 break;
             case 4: 
                 cout << "\nPayment cancelled.\n";
@@ -581,7 +581,7 @@ public:
         cout << "            PAYMENT CONFIRMATION           \n";
         cout << "============================================\n";
         cout << "  User: " << username << "\n";
-        cout << "  Total Amount: ₹" << fixed << setprecision(2) << totalAmount << "\n";
+        cout << "  Total Amount: Rs." << fixed << setprecision(2) << totalAmount << "\n";
         cout << "  Payment Method: " << paymentMethod << "\n";
         cout << "  Status: CONFIRMED\n";
         cout << "  Date: " << dateStr << "\n";
@@ -593,7 +593,6 @@ public:
         cout << "\nPress any key to continue...";
         _getch();
     }
-
     
 };
 
