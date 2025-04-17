@@ -225,15 +225,7 @@ public:
         return true;
     }
 
-    void displayBill() {
-        int totalBooked = count(bookedSeats.begin(), bookedSeats.end(), 1);
-        double totalAmount = totalBooked * 10.0;
-        cout << "\n----- Booking Summary -----\n";
-        cout << "Movie: " << currentMovie << endl;
-        cout << "Tickets booked: " << totalBooked << endl;
-        cout << "Total amount: $" << fixed << setprecision(2) << totalAmount << endl;
-        cout << "--------------------------\n";
-    }
+   
 
     bool isLoggedIn() const {
         return loggedin;
@@ -455,6 +447,154 @@ public:
             if (choice == 2) return;
         }
     }
+
+
+    void displayBill() {
+        system("CLS");
+        
+        ifstream bookingFile("bookings.txt");
+        if (!bookingFile) {
+            cout << "No bookings found!\n";
+            cout << "Press any key to continue...";
+            _getch();
+            return;
+        }
+    
+        // Get current date and time
+        time_t now = time(0);
+        tm *ltm = localtime(&now);
+        char dateStr[11];
+        char timeStr[9];
+        strftime(dateStr, sizeof(dateStr), "%d/%m/%Y", ltm);
+        strftime(timeStr, sizeof(timeStr), "%H:%M:%S", ltm);
+    
+        // Store all bookings for this user
+        vector<pair<string, vector<string>>> userBookings;
+        string line;
+        
+        while (getline(bookingFile, line)) {
+            istringstream iss(line);
+            string user, movie;
+            iss >> user >> movie;
+            
+            if (user == username) {
+                vector<string> seats;
+                string seat;
+                while (iss >> seat) {
+                    seats.push_back(seat);
+                }
+                userBookings.emplace_back(movie, seats);
+            }
+        }
+        bookingFile.close();
+    
+        if (userBookings.empty()) {
+            cout << "No bookings found for this user.\n";
+            cout << "Press any key to continue...";
+            _getch();
+            return;
+        }
+    
+        // Calculate total amount
+        double totalAmount = 0;
+        const double TICKET_PRICE = 110.0;
+        for (const auto& booking : userBookings) {
+            totalAmount += booking.second.size() * TICKET_PRICE;
+        }
+    
+        // Display complete bill first
+        system("CLS");
+        cout << "============================================\n";
+        cout << "              BOOKING SUMMARY               \n";
+        cout << "============================================\n";
+        cout << "  User: " << username << "\n";
+        cout << "  City: " << city << "\n";
+        cout << "  Date: " << dateStr << "\n";
+        cout << "  Time: " << timeStr << "\n";
+        cout << "--------------------------------------------\n";
+        
+        // Display all bookings
+        for (const auto& booking : userBookings) {
+            cout << "  Movie: " << booking.first << "\n";
+            cout << "  Seats: ";
+            for (const auto& seat : booking.second) {
+                cout << seat << " ";
+            }
+            cout << "\n";
+            cout << "  Tickets: " << booking.second.size() << "\n";
+            cout << "  Amount: ₹" << fixed << setprecision(2) 
+                 << (booking.second.size() * TICKET_PRICE) << "\n";
+            cout << "--------------------------------------------\n";
+        }
+        
+        // Display total
+        cout << "  TOTAL AMOUNT: ₹" << fixed << setprecision(2) << totalAmount << "\n";
+        cout << "============================================\n";
+        
+        cout << "\nPress any key to view payment options...";
+        _getch();
+    
+        // Now show payment options
+        system("CLS");
+        cout << "============================================\n";
+        cout << "           SELECT PAYMENT METHOD           \n";
+        cout << "============================================\n";
+        cout << "1. Cash\n";
+        cout << "2. Debit/Credit Card\n";
+        cout << "3. Online Payment\n";
+        cout << "4. Cancel Payment\n";
+        cout << "============================================\n";
+        cout << "Enter your choice (1-4): ";
+        
+        int paymentChoice;
+        cin >> paymentChoice;
+        
+        string paymentMethod;
+        switch (paymentChoice) {
+            case 1: 
+                paymentMethod = "Cash";
+                cout << "\nPlease pay ₹" << totalAmount << " at the theater counter.\n";
+                break;
+            case 2: 
+                paymentMethod = "Debit/Credit Card";
+                cout << "\nCard payment selected for ₹" << totalAmount << "\n";
+                break;
+            case 3: 
+                paymentMethod = "Online Payment";
+                cout << "\nOnline payment selected for ₹" << totalAmount << "\n";
+                break;
+            case 4: 
+                cout << "\nPayment cancelled.\n";
+                cout << "Press any key to continue...";
+                _getch();
+                return;
+            default:
+                cout << "\nInvalid option selected.\n";
+                cout << "Press any key to continue...";
+                _getch();
+                return;
+        }
+    
+        // Show payment confirmation
+        system("CLS");
+        cout << "============================================\n";
+        cout << "            PAYMENT CONFIRMATION           \n";
+        cout << "============================================\n";
+        cout << "  User: " << username << "\n";
+        cout << "  Total Amount: ₹" << fixed << setprecision(2) << totalAmount << "\n";
+        cout << "  Payment Method: " << paymentMethod << "\n";
+        cout << "  Status: CONFIRMED\n";
+        cout << "  Date: " << dateStr << "\n";
+        cout << "  Time: " << timeStr << "\n";
+        cout << "============================================\n";
+        cout << "       Thank you for your payment!         \n";
+        cout << "============================================\n";
+        
+        cout << "\nPress any key to continue...";
+        _getch();
+    }
+
+    
 };
 
 int main() {
@@ -462,10 +602,11 @@ int main() {
     while (true) {
         system("CLS");
         cout << "***** Welcome to Movie Ticket Booking *****\n";
+        cout << "*******************************************\n";
         cout << "1. Register\n";
         cout << "2. Login\n";
         cout << "3. Exit\n";
-        cout << "******************************************\n";
+        cout << "*******************************************\n";
 
         int choice;
         cout << "Enter your choice (1-3): ";
