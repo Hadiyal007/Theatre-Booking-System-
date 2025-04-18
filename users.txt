@@ -1,12 +1,2 @@
-1 123 Ahmedabad
-11 11 Ahmedabad
-h1 12 Ahmedabad
-f 1 Ahmedabad
-123 12 Ahmedabad
-a 1 Ahmedabad
-s 1
-Surat
-viral_024 120
-Rajkot
-prashant 123
+1 123
 Surat
