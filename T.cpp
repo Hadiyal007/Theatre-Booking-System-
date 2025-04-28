@@ -7,8 +7,9 @@
 #include <sstream>
 #include <iomanip>
 #include <cctype>
-#include <limits>
 #include <ctime>
+#include <map>
+#include <limits>
 
 using namespace std;
 
@@ -18,8 +19,8 @@ private:
     string password;
     string city;
     bool loggedin = false;
-    vector<string> cities = {"Ahmedabad", "Surat", "Nadiad", "Vadodara", "Rajkot", "Anand", "Sabarkantha", "Surendranagar"};
-    vector<char> bookedSeats;
+    vector<string> cities = {"Ahmedabad", "Surat", "Nadiad", "Vadodara", "Rajkot"};
+    vector<bool> bookedSeats;
     const int rows = 10;
     const int seatsPerRow = 10;
     const int totalSeats = rows * seatsPerRow;
@@ -28,36 +29,29 @@ private:
         "Chhava", "Bahubali 2", "Pushpa 2", 
         "KGF 2", "Avengers Endgame", "Captain America: Brave New World"
     };
-    time_t lastBookingTime;
-    time_t paymentTime;
 
-    int getValidInput(int min, int max) {
-        int choice;
-        while (true) {
-            cin >> choice;
-            if (cin.fail() || choice < min || choice > max) {
-                cin.clear();
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                cout << "Invalid input! Please enter a number between " << min << " and " << max << ": ";
-            } else {
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                return choice;
-            }
-        }
-    }
+    struct Booking {
+        string movie;
+        vector<string> seats;
+        string bookingTime;
+        bool paid;
+    };
+    vector<Booking> userBookings;
 
     bool userExists(const string& user) {
         ifstream file("users.txt");
-        if (!file) return false;
+        if (!file.is_open()) return false;
 
         string storedUser, storedPass, storedCity;
         while (file >> storedUser >> storedPass) {
             file.ignore();
             getline(file, storedCity);
             if (storedUser == user) {
+                file.close();
                 return true;
             }
         }
+        file.close();
         return false;
     }
 
@@ -81,57 +75,62 @@ private:
     }
 
     string getSeatFileName(const string& movieName) {
-        return "seats_" + movieName + ".dat";
+        string sanitized;
+        for (char c : movieName) {
+            if (isalnum(c) || c == ' ' || c == '_') {
+                sanitized += c;
+            } else {
+                sanitized += '_';
+            }
+        }
+        return "seats_" + sanitized + ".dat";
     }
 
     void loadSeatsForMovie(const string& movieName) {
-        bookedSeats.assign(totalSeats, 0);
+        bookedSeats.assign(totalSeats, false);
         string filename = getSeatFileName(movieName);
         ifstream file(filename, ios::binary);
-        if (file) {
-            file.read(reinterpret_cast<char*>(bookedSeats.data()), totalSeats * sizeof(char));
+        if (file.is_open()) {
+            for (int i = 0; i < totalSeats; i++) {
+                bool status;
+                file.read(reinterpret_cast<char*>(&status), sizeof(bool));
+                bookedSeats[i] = status;
+            }
             file.close();
         }
-        
-        time_t currentTime = time(nullptr);
-        if (difftime(currentTime, lastBookingTime) >= 3 * 3600) {
-            resetSeats();
-        }
-    }
-
-    void resetSeats() {
-        bookedSeats.assign(totalSeats, 0);
-        cout << "All seats have been reset after 3 hours.\n";
-        saveSeatsForMovie(currentMovie);
     }
 
     void saveSeatsForMovie(const string& movieName) {
         string filename = getSeatFileName(movieName);
         ofstream file(filename, ios::binary);
-        if (file) {
-            file.write(reinterpret_cast<const char*>(bookedSeats.data()), totalSeats * sizeof(char));
+        if (file.is_open()) {
+            for (bool status : bookedSeats) {
+                file.write(reinterpret_cast<const char*>(&status), sizeof(bool));
+            }
             file.close();
         }
     }
 
-    void saveBooking() {
-        ofstream bookingFile("bookings.txt", ios::app);
+    void saveAllBookings() {
+        ofstream bookingFile("bookings.txt");
         if (bookingFile.is_open()) {
-            time_t now = time(nullptr);
-            bookingFile << username << " " << currentMovie << " " << now << " ";
-            for (int i = 0; i < totalSeats; ++i) {
-                if (bookedSeats[i]) {
-                    bookingFile << static_cast<char>('A' + (i / seatsPerRow)) << (i % seatsPerRow + 1) << " ";
+            for (const auto& booking : userBookings) {
+                if (booking.seats.empty()) continue;
+                
+                bookingFile << username << "|" << booking.movie << "|" 
+                          << booking.bookingTime << "|" 
+                          << (booking.paid ? "1" : "0") << "|";
+                for (const auto& seat : booking.seats) {
+                    bookingFile << seat << ",";
                 }
+                bookingFile << endl;
             }
-            bookingFile << endl;
             bookingFile.close();
-            lastBookingTime = now;
         }
     }
 
     bool isValidSeat(const string& seatLabel) {
-        if (seatLabel.length() < 2) return false;
+        if (seatLabel.length() < 2 || seatLabel.length() > 3) return false;
         
         char rowChar = toupper(seatLabel[0]);
         if (rowChar < 'A' || rowChar >= 'A' + rows) return false;
@@ -146,68 +145,92 @@ private:
         return true;
     }
 
-    void deleteOldBookings() {
-        time_t currentTime = time(nullptr);
-        ifstream bookingFile("bookings.txt");
-        if (!bookingFile) return;
+    string getCurrentDateTime() {
+        time_t now = time(0);
+        tm *ltm = localtime(&now);
+        char buf[20];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", ltm);
+        return string(buf);
+    }
 
-        vector<string> linesToKeep;
-        string line;
-        
-        while (getline(bookingFile, line)) {
-            istringstream iss(line);
-            string user, movie;
-            iss >> user >> movie;
-            
-            // Only keep bookings that aren't for this user or are recent
-            if (user != username || difftime(currentTime, paymentTime) < 3 * 3600) {
-                linesToKeep.push_back(line);
+    void clearInputBuffer() {
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+
+    int getValidatedInput(int min, int max) {
+        int input;
+        while (true) {
+            cin >> input;
+            if (cin.fail() || input < min || input > max) {
+                cout << "Invalid input. Please enter a number between " 
+                     << min << " and " << max << ": ";
+                clearInputBuffer();
+            } else {
+                clearInputBuffer();
+                return input;
             }
-        }
-        bookingFile.close();
-
-        // Rewrite the file with only the lines we want to keep
-        ofstream outFile("bookings.txt");
-        for (const auto& l : linesToKeep) {
-            outFile << l << endl;
         }
     }
 
 public:
-    User() : bookedSeats(totalSeats, 0), lastBookingTime(0), paymentTime(0) {}
+    User() : bookedSeats(totalSeats, false) {}
 
     void registerUser() {
         cout << "Enter username: ";
         cin >> username;
+        clearInputBuffer();
+        
+        if (username.empty() || username.find(' ') != string::npos) {
+            cout << "Invalid username. Usernames cannot be empty or contain spaces." << endl;
+            return;
+        }
+
         if (userExists(username)) {
             cout << "Username already exists. Please choose a different one." << endl;
             return;
         }
+
         password = getPassword();
         
         cout << "Select your city:\n";
         for (size_t i = 0; i < cities.size(); i++) {
-            cout << i << ": " << cities[i] << "\n";
+            cout << i + 1 << ". " << cities[i] << "\n";
         }
-        cout << "Enter city choice (0-" << cities.size()-1 << "): ";
-        int cityIndex = getValidInput(0, cities.size()-1);
+        cout << "Enter choice (1-" << cities.size() << "): ";
+        
+        int cityIndex = getValidatedInput(1, cities.size()) - 1;
         city = cities[cityIndex];
 
         ofstream file("users.txt", ios::app);
-        file << username << " " << password << endl << city << endl;
-        cout << "Registration successful!" << endl;
+        if (file.is_open()) {
+            file << username << " " << password << endl << city << endl;
+            file.close();
+            cout << "Registration successful!" << endl;
+        } else {
+            cout << "Error saving user data." << endl;
+        }
     }
 
     void loginUser() {
         cout << "Enter username: ";
         cin >> username;
+        clearInputBuffer();
+        
         if (!userExists(username)) {
             cout << "User does not exist." << endl;
             return;
         }
+
         password = getPassword();
         ifstream file("users.txt");
+        if (!file.is_open()) {
+            cout << "Error accessing user database." << endl;
+            return;
+        }
+
         string storedUser, storedPass, storedCity;
+        bool found = false;
         while (file >> storedUser >> storedPass) {
             file.ignore();
             getline(file, storedCity);
@@ -215,14 +238,21 @@ public:
                 loggedin = true;
                 city = storedCity;
                 cout << "Login successful!" << endl;
-                return;
+                found = true;
+                break;
             }
         }
-        cout << "Invalid credentials." << endl;
+        file.close();
+
+        if (!found) {
+            cout << "Invalid credentials." << endl;
+        } else {
+            loadUserBookings();
+        }
     }
 
     void showSeatingLayout() {
-        cout << "Seating arrangement for " << currentMovie << ":\n";
+        cout << "\nSeating arrangement for " << currentMovie << ":\n";
         cout << "-----------------------------------\n";
         cout << "   ";
         for (int i = 1; i <= seatsPerRow; ++i) {
@@ -256,9 +286,8 @@ public:
             return false;
         }
     
-        bookedSeats[seatIndex] = 1;
+        bookedSeats[seatIndex] = true;
         saveSeatsForMovie(currentMovie);
-        saveBooking();
         return true;
     }
 
@@ -277,9 +306,23 @@ public:
             return false;
         }
     
-        bookedSeats[seatIndex] = 0;
+        bookedSeats[seatIndex] = false;
         saveSeatsForMovie(currentMovie);
-        saveBooking();
+        
+        for (auto it = userBookings.begin(); it != userBookings.end(); ) {
+            auto& seats = it->seats;
+            auto seatIt = find(seats.begin(), seats.end(), seatLabel);
+            if (seatIt != seats.end()) {
+                seats.erase(seatIt);
+                if (seats.empty()) {
+                    it = userBookings.erase(it);
+                    continue;
+                }
+            }
+            ++it;
+        }
+        
+        saveAllBookings();
         return true;
     }
 
@@ -294,8 +337,8 @@ public:
     
         while (true) {
             system("CLS");
-            cout << "\n----- Movie Ticket Booking System ----- \n";
-            cout << "***************************************\n";
+            cout << "\n***** Movie Ticket Booking System *****\n";
+            cout << "Welcome, " << username << " (" << city << ")\n";
             cout << "1. Book Tickets\n";
             cout << "2. Cancel Tickets\n";
             cout << "3. View Booking Summary\n";
@@ -303,63 +346,73 @@ public:
             cout << "***************************************\n";
     
             cout << "Enter your choice (1-4): ";
-            int choice = getValidInput(1, 4);
+            int choice = getValidatedInput(1, 4);
     
             switch (choice) {
-                case 1: 
-                    bookTicketMenu(); 
-                    break;
-                case 2: 
-                    loadUserBookings();
-                    removeTicketMenu(); 
-                    break;
-                case 3: 
-                    displayBill(); 
-                    break;
-                case 4: 
-                    return;
+                case 1: bookTicketMenu(); break;
+                case 2: removeTicketMenu(); break;
+                case 3: displayBill(); break;
+                case 4: return;
             }
         }
     }
 
     void loadUserBookings() {
+        userBookings.clear();
         ifstream bookingFile("bookings.txt");
-        if (!bookingFile) return;
+        if (!bookingFile.is_open()) return;
     
         string line;
         while (getline(bookingFile, line)) {
-            istringstream iss(line);
-            string user, movie;
-            iss >> user >> movie;
+            size_t pos = 0;
+            string token;
+            vector<string> tokens;
             
-            if (user == username) {
-                currentMovie = movie;
-                loadSeatsForMovie(currentMovie);
-                break;
+            while ((pos = line.find('|')) != string::npos) {
+                token = line.substr(0, pos);
+                tokens.push_back(token);
+                line.erase(0, pos + 1);
+            }
+            tokens.push_back(line);
+            
+            if (tokens.size() < 5) continue;
+            
+            string user = tokens[0];
+            if (user != username) continue;
+            
+            Booking booking;
+            booking.movie = tokens[1];
+            booking.bookingTime = tokens[2];
+            booking.paid = (tokens[3] == "1");
+            
+            string seatsStr = tokens[4];
+            size_t seatPos = 0;
+            while ((seatPos = seatsStr.find(',')) != string::npos) {
+                token = seatsStr.substr(0, seatPos);
+                if (!token.empty()) {
+                    booking.seats.push_back(token);
+                }
+                seatsStr.erase(0, seatPos + 1);
+            }
+            
+            if (!booking.seats.empty()) {
+                userBookings.push_back(booking);
             }
         }
         bookingFile.close();
-    
-        if (currentMovie.empty()) {
-            cout << "No bookings found for this user.\n";
-            cout << "Press any key to continue...";
-            _getch();
-        }
     }
 
     void bookTicketMenu() {
         while (true) {
             system("CLS");
             cout << "Available Movies:\n";
-            cout << "************************************\n";
             for (size_t i = 0; i < movies.size(); i++) {
                 cout << i + 1 << ". " << movies[i] << "\n";
             }
             cout << movies.size() + 1 << ". Back to Main Menu\n";
-            cout << "************************************\n";
-            
+
             cout << "Select a movie (1-" << movies.size() + 1 << "): ";
-            int choice = getValidInput(1, movies.size() + 1);
+            int choice = getValidatedInput(1, movies.size() + 1);
 
             if (choice == movies.size() + 1) return;
             
@@ -388,17 +441,16 @@ public:
             "Anthony Mackie, Harrison Ford..."
         };
 
-        cout << "\n----- Movie Details -----\n";
-        cout << "****************************\n";
+        cout << "\n***** Movie Details *****\n";
         cout << "Title: " << movies[movieIndex] << "\n";
         cout << "Synopsis: " << details[movieIndex] << "\n";
         cout << "Cast: " << casts[movieIndex] << "\n";
-        cout << "****************************\n";
+        cout << "************************\n";
 
         cout << "1. Book Tickets\n";
         cout << "2. Back to Movies\n";
         cout << "Enter your choice (1-2): ";
-        int choice = getValidInput(1, 2);
+        int choice = getValidatedInput(1, 2);
 
         if (choice == 1) {
             showSeating();
@@ -411,10 +463,21 @@ public:
             showSeatingLayout();
             
             cout << "How many tickets do you want to book? (0 to cancel): ";
-            int ticketCount = getValidInput(0, totalSeats);
+            int ticketCount;
+            cin >> ticketCount;
+            clearInputBuffer();
     
             if (ticketCount == 0) return;
+            if (ticketCount < 0) {
+                cout << "Invalid number of tickets. Please try again.\n";
+                continue;
+            }
     
+            Booking newBooking;
+            newBooking.movie = currentMovie;
+            newBooking.bookingTime = getCurrentDateTime();
+            newBooking.paid = false;
+            
             int ticketsBooked = 0;
             while (ticketsBooked < ticketCount) {
                 system("CLS");
@@ -424,8 +487,10 @@ public:
                 string seatLabel;
                 cout << "Enter seat number (e.g., A1, B2): ";
                 cin >> seatLabel;
+                clearInputBuffer();
     
                 if (bookTicket(seatLabel)) {
+                    newBooking.seats.push_back(seatLabel);
                     ticketsBooked++;
                     system("CLS");
                     showSeatingLayout();
@@ -443,204 +508,206 @@ public:
                 }
             }
             
-            if(ticketCount == 1) {
-                cout << "\nSuccessfully booked " << ticketsBooked << " ticket!\n";
-            } else {
-                cout << "\nSuccessfully booked " << ticketsBooked << " tickets!\n";
-            }
+            userBookings.push_back(newBooking);
+            saveAllBookings();
+            
+            cout << "\nSuccessfully booked " << ticketsBooked << " ticket" 
+                 << (ticketsBooked > 1 ? "s" : "") << "!\n";
             
             cout << "1. Book more tickets\n";
             cout << "2. Back to Main Menu\n";
             cout << "Enter your choice (1-2): ";
             
-            int choice = getValidInput(1, 2);
+            int choice = getValidatedInput(1, 2);
             if (choice == 2) return;
         }
     }
 
     void removeTicketMenu() {
-        if (currentMovie.empty()) {
+        loadUserBookings();
+        if (userBookings.empty()) {
             cout << "You don't have any bookings to cancel.\n";
             cout << "Press any key to continue...";
             _getch();
             return;
         }
-    
+        
         while (true) {
             system("CLS");
-            showSeatingLayout();
+            cout << "Select booking to modify:\n";
+            for (size_t i = 0; i < userBookings.size(); i++) {
+                cout << i+1 << ". " << userBookings[i].movie << " (" 
+                     << userBookings[i].seats.size() << " seats) - "
+                     << (userBookings[i].paid ? "Paid" : "Unpaid") << endl;
+            }
+            cout << "0. Back to Main Menu\n";
+            cout << "Enter choice: ";
             
-            string seatLabel;
-            cout << "Enter seat number to cancel (e.g., A1, B2) or 0 to go back: ";
-            cin >> seatLabel;
-
-            if (seatLabel == "0") return;
+            int choice;
+            cin >> choice;
+            clearInputBuffer();
             
-            if (removeTicket(seatLabel)) {
+            if (choice == 0) return;
+            if (choice < 1 || choice > userBookings.size()) {
+                cout << "Invalid choice!\n";
+                cout << "Press any key to continue...";
+                _getch();
+                continue;
+            }
+            
+            Booking& selectedBooking = userBookings[choice-1];
+            currentMovie = selectedBooking.movie;
+            loadSeatsForMovie(currentMovie);
+            
+            while (true) {
                 system("CLS");
                 showSeatingLayout();
-                cout << "Seat " << seatLabel << " has been successfully canceled.\n";
+                
+                cout << "Current booking for " << selectedBooking.movie << ":\n";
+                for (const auto& seat : selectedBooking.seats) {
+                    cout << seat << " ";
+                }
+                cout << endl;
+                
+                string seatLabel;
+                cout << "Enter seat number to cancel (e.g., A1, B2) or 0 to go back: ";
+                cin >> seatLabel;
+                clearInputBuffer();
+        
+                if (seatLabel == "0") {
+                    saveAllBookings();
+                    break;
+                }
+                
+                if (removeTicket(seatLabel)) {
+                    auto& seats = selectedBooking.seats;
+                    seats.erase(remove(seats.begin(), seats.end(), seatLabel), seats.end());
+                    
+                    system("CLS");
+                    showSeatingLayout();
+                    cout << "Seat " << seatLabel << " has been successfully canceled.\n";
+                    
+                    if (seats.empty()) {
+                        userBookings.erase(userBookings.begin() + (choice-1));
+                        cout << "All seats canceled for this booking.\n";
+                        saveAllBookings();
+                        cout << "Press any key to continue...";
+                        _getch();
+                        break;
+                    }
+                }
+        
+                cout << "\n1. Cancel another ticket\n";
+                cout << "2. Back to Booking Selection\n";
+                cout << "Enter your choice (1-2): ";
+                
+                int option = getValidatedInput(1, 2);
+                if (option == 2) {
+                    saveAllBookings();
+                    break;
+                }
             }
-    
-            cout << "\n1. Cancel another ticket\n";
-            cout << "2. Back to Main Menu\n";
-            cout << "Enter your choice (1-2): ";
-            
-            int choice = getValidInput(1, 2);
-            if (choice == 2) return;
         }
     }
 
     void displayBill() {
-        system("CLS");
+        loadUserBookings();
         
-        ifstream bookingFile("bookings.txt");
-        if (!bookingFile) {
+        userBookings.erase(
+            remove_if(userBookings.begin(), userBookings.end(), 
+                     [](const Booking& b) { return b.seats.empty(); }),
+            userBookings.end());
+        
+        if (userBookings.empty()) {
             cout << "No bookings found!\n";
             cout << "Press any key to continue...";
             _getch();
             return;
-        }    
-    
-        // Get current date and time
-        time_t now = time(0);
-        tm *ltm = localtime(&now);
-        char dateStr[11];
-        char timeStr[9];
-        strftime(dateStr, sizeof(dateStr), "%d/%m/%Y", ltm);
-        strftime(timeStr, sizeof(timeStr), "%H:%M:%S", ltm);
-    
-        // Structure to hold booking information
-        struct BookingRecord {
-            string movie;
-            vector<string> seats;
-            string bookingTime;
-        };
-    
-        vector<BookingRecord> allBookings;
-        string line;
-        
-        // Read all bookings for this user
-        while (getline(bookingFile, line)) {
-            istringstream iss(line);
-            string user, movie, timestamp;
-            
-            // Read user, movie and timestamp
-            if (!(iss >> user >> movie >> timestamp)) {
-                continue;  // Skip malformed lines
-            }
-            
-            if (user != username) {
-                continue;  // Skip other users' bookings
-            }
-    
-            // Read all seats
-            vector<string> seats;
-            string seat;
-            while (iss >> seat) {
-                seats.push_back(seat);
-            }
-    
-            // Convert timestamp to readable time
-            try {
-                time_t bookingTime = stol(timestamp);
-                tm *btm = localtime(&bookingTime);
-                char bookingTimeStr[9];
-                strftime(bookingTimeStr, sizeof(bookingTimeStr), "%H:%M:%S", btm);
-                
-                allBookings.push_back({movie, seats, bookingTimeStr});
-            } catch (...) {
-                continue;  // Skip entries with invalid timestamps
-            }
         }
-        bookingFile.close();
-    
-        if (allBookings.empty()) {
-            cout << "No bookings found for this user.\n";
-            cout << "Press any key to continue...";
-            _getch();
+        
+        map<string, vector<Booking>> movieBookings;
+        for (const auto& booking : userBookings) {
+            movieBookings[booking.movie].push_back(booking);
+        }
+        
+        bool allPaid = all_of(userBookings.begin(), userBookings.end(), 
+                            [](const Booking& b) { return b.paid; });
+        
+        if (allPaid) {
+            showFinalBill(movieBookings);
             return;
         }
-    
-        // Sort bookings by movie name
-        sort(allBookings.begin(), allBookings.end(), 
-            [](const BookingRecord& a, const BookingRecord& b) {
-                return a.movie < b.movie;
-            });
-    
+        
+        system("CLS");
         const double TICKET_PRICE = 110.0;
         double totalAmount = 0;
-    
-        // Display header
-        system("CLS");
-        cout << "============================================\n";
-        cout << "              BOOKING SUMMARY               \n";
-        cout << "============================================\n";
-        cout << "  User: " << username << "\n";
-        cout << "  City: " << city << "\n";
-        cout << "  Date: " << dateStr << "\n";
-        cout << "  Current Time: " << timeStr << "\n";
-        cout << "--------------------------------------------\n";
         
-        // Display bookings grouped by movie
-        string currentMovie;
-        int movieTickets = 0;
-        double movieAmount = 0;
-        bool firstMovie = true;
-    
-        for (const auto& booking : allBookings) {
-            if (booking.movie != currentMovie) {
-                // Print summary for previous movie
-                if (!firstMovie) {
-                    cout << "  TOTAL for " << currentMovie << ": " << movieTickets 
-                         << " tickets, Rs." << fixed << setprecision(2) << movieAmount << "\n";
-                    cout << "--------------------------------------------\n";
+        cout << "============================================\n";
+        cout << "          PENDING BOOKINGS (UNPAID)         \n";
+        cout << "============================================\n";
+        
+        for (const auto& movieGroup : movieBookings) {
+            const string& movie = movieGroup.first;
+            const vector<Booking>& bookings = movieGroup.second;
+            
+            bool allPaidForMovie = all_of(bookings.begin(), bookings.end(), 
+                                         [](const Booking& b) { return b.paid; });
+            if (allPaidForMovie) continue;
+            
+            cout << "  Movie: " << movie << "\n";
+            
+            vector<string> allSeats;
+            string bookingTimes;
+            int totalTickets = 0;
+            
+            for (const auto& booking : bookings) {
+                if (!booking.paid) {
+                    allSeats.insert(allSeats.end(), booking.seats.begin(), booking.seats.end());
+                    if (!bookingTimes.empty()) bookingTimes += ", ";
+                    bookingTimes += booking.bookingTime;
+                    totalTickets += booking.seats.size();
                 }
-                
-                // Start new movie section
-                currentMovie = booking.movie;
-                movieTickets = 0;
-                movieAmount = 0;
-                firstMovie = false;
-                
-                cout << "  Movie: " << currentMovie << "\n";
-                cout << "  ------------------------------------------\n";
             }
             
-            // Display booking details
-            cout << "  Booking Time: " << booking.bookingTime << "\n";
+            if (totalTickets == 0) continue;
+            
+            double movieAmount = totalTickets * TICKET_PRICE;
+            totalAmount += movieAmount;
+            
+            cout << "  Booking Times: " << bookingTimes << "\n";
             cout << "  Seats: ";
-            for (const auto& seat : booking.seats) {
+            for (const auto& seat : allSeats) {
                 cout << seat << " ";
             }
             cout << "\n";
-            cout << "  Tickets: " << booking.seats.size() << "\n";
-            cout << "  Amount: Rs." << fixed << setprecision(2) 
-                 << (booking.seats.size() * TICKET_PRICE) << "\n";
-            cout << "  ------------------------------------------\n";
-            
-            // Update totals
-            movieTickets += booking.seats.size();
-            movieAmount += booking.seats.size() * TICKET_PRICE;
-            totalAmount += booking.seats.size() * TICKET_PRICE;
-        }
-        
-        // Print summary for the last movie
-        if (!firstMovie) {
-            cout << "  TOTAL for " << currentMovie << ": " << movieTickets 
-                 << " tickets, Rs." << fixed << setprecision(2) << movieAmount << "\n";
+            cout << "  Tickets: " << totalTickets << "\n";
+            cout << "  Amount: Rs." << fixed << setprecision(2) << movieAmount << "\n";
             cout << "--------------------------------------------\n";
         }
         
-        // Display grand total
-        cout << "  GRAND TOTAL: Rs." << fixed << setprecision(2) << totalAmount << "\n";
-        cout << "============================================\n";
+        if (totalAmount > 0) {
+            cout << "  TOTAL PENDING: Rs." << fixed << setprecision(2) << totalAmount << "\n";
+            cout << "============================================\n";
+            
+            cout << "\nPress any key to view payment options...";
+            _getch();
+            processPayment();
+        } else {
+            cout << "  No unpaid bookings found!\n";
+            cout << "============================================\n";
+            cout << "\nPress any key to continue...";
+            _getch();
+        }
         
-        // Proceed to payment options
-        cout << "\nPress any key to view payment options...";
-        _getch();
+        bool hasPaidBookings = any_of(userBookings.begin(), userBookings.end(), 
+                                     [](const Booking& b) { return b.paid; });
+        
+        if (hasPaidBookings) {
+            showFinalBill(movieBookings);
+        }
+    }
     
-        // Payment options menu
+    void processPayment() {
         while (true) {
             system("CLS");
             cout << "============================================\n";
@@ -653,54 +720,100 @@ public:
             cout << "============================================\n";
             cout << "Enter your choice (1-4): ";
             
-            int paymentChoice = getValidInput(1, 4);
+            int paymentChoice = getValidatedInput(1, 4);
+            
+            if (paymentChoice == 4) {
+                return;
+            }
             
             string paymentMethod;
             switch (paymentChoice) {
-                case 1: 
-                    paymentMethod = "Cash";
-                    cout << "\nPlease pay ₹" << totalAmount << " at the theater counter.\n";
-                    break;
-                case 2: 
-                    paymentMethod = "Debit/Credit Card";
-                    cout << "\nCard payment selected for Rupees" << totalAmount << "\n";
-                    break;
-                case 3: 
-                    paymentMethod = "Online Payment";
-                    cout << "\nOnline payment selected for Rupees" << totalAmount << "\n";
-                    break;
-                case 4: 
-                    cout << "\nPayment cancelled.\n";
-                    cout << "Press any key to continue...";
-                    _getch();
-                    return;
+                case 1: paymentMethod = "Cash"; break;
+                case 2: paymentMethod = "Debit/Credit Card"; break;
+                case 3: paymentMethod = "Online Payment"; break;
             }
-        
-            // Record payment time
-            paymentTime = time(nullptr);
             
-            // Display payment confirmation
+            for (auto& booking : userBookings) {
+                if (!booking.paid) {
+                    booking.paid = true;
+                }
+            }
+            saveAllBookings();
+            
             system("CLS");
+            string paymentTime = getCurrentDateTime();
             cout << "============================================\n";
             cout << "            PAYMENT CONFIRMATION           \n";
             cout << "============================================\n";
             cout << "  User: " << username << "\n";
-            cout << "  Total Amount: Rs." << fixed << setprecision(2) << totalAmount << "\n";
             cout << "  Payment Method: " << paymentMethod << "\n";
             cout << "  Status: CONFIRMED\n";
-            cout << "  Date: " << dateStr << "\n";
-            cout << "  Time: " << timeStr << "\n";
+            cout << "  Payment Time: " << paymentTime << "\n";
             cout << "============================================\n";
             cout << "       Thank you for your payment!         \n";
             cout << "============================================\n";
             
-            // Delete old bookings
-            deleteOldBookings();
+            cout << "\n1. View Booking Summary\n";
+            cout << "2. Return to Main Menu\n";
+            cout << "Enter choice: ";
             
-            cout << "\nPress any key to continue...";
-            _getch();
+            int choice = getValidatedInput(1, 2);
+            if (choice == 1) {
+                map<string, vector<Booking>> movieBookings;
+                for (const auto& booking : userBookings) {
+                    movieBookings[booking.movie].push_back(booking);
+                }
+                showFinalBill(movieBookings);
+            }
             return;
         }
+    }
+    
+    void showFinalBill(const map<string, vector<Booking>>& movieBookings) {
+        system("CLS");
+        const double TICKET_PRICE = 110.0;
+        
+        cout << "============================================\n";
+        cout << "            FINAL BOOKING SUMMARY          \n";
+        cout << "============================================\n";
+        cout << "  User: " << username << "\n";
+        cout << "  City: " << city << "\n";
+        cout << "  Current Date: " << getCurrentDateTime() << "\n";
+        cout << "============================================\n";
+        
+        double totalAmount = 0;
+        
+        for (const auto& booking : userBookings) {
+            if (!booking.paid) continue;
+            
+            const string& movie = booking.movie;
+            cout << "  Movie: " << movie << "\n";
+            
+            vector<string> allSeats = booking.seats;
+            string bookingTimes = booking.bookingTime;
+            int totalTickets = allSeats.size();
+            
+            double movieAmount = totalTickets * TICKET_PRICE;
+            totalAmount += movieAmount;
+            
+            cout << "  Booking Time: " << bookingTimes << "\n";
+            cout << "  Seats: ";
+            for (const auto& seat : allSeats) {
+                cout << seat << " ";
+            }
+            cout << "\n";
+            cout << "  Tickets: " << totalTickets << "\n";
+            cout << "  Amount: Rs." << fixed << setprecision(2) << movieAmount << " (Paid)\n";
+            cout << "--------------------------------------------\n";
+        }
+        
+        cout << "  TOTAL AMOUNT: Rs." << fixed << setprecision(2) << totalAmount << "\n";
+        cout << "============================================\n";
+        cout << "       All payments completed!             \n";
+        cout << "============================================\n";
+        
+        cout << "\nPress any key to continue...";
+        _getch();
     }
 };
 
@@ -708,7 +821,7 @@ int main() {
     User user;
     while (true) {
         system("CLS");
-        cout << "----- Welcome to Movie Ticket Booking -----\n";
+        cout << "***** Welcome to Movie Ticket Booking *****\n";
         cout << "*******************************************\n";
         cout << "1. Register\n";
         cout << "2. Login\n";
@@ -718,15 +831,7 @@ int main() {
         cout << "Enter your choice (1-3): ";
         int choice;
         cin >> choice;
-
-        if (cin.fail() || choice < 1 || choice > 3) {
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Invalid choice! Please enter a number between 1-3.\n";
-            cout << "Press any key to try again...";
-            _getch();
-            continue;
-        }
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
         switch (choice) {
             case 1:
@@ -740,6 +845,8 @@ int main() {
                 break;
             case 3:
                 return 0;
+            default:
+                cout << "Invalid choice! Please try again.\n";
         }
         
         cout << "\nPress any key to continue...";
