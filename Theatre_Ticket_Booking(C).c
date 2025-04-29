@@ -1,3 +1,10 @@
+/*
+  This project is about a THEATRE TICKET BOOKING SYSTEM.
+  We have developed this project in C++ and after convert this in C.
+  The system allows users to book movie tickets efficiently and manage seat availability.
+*/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -373,9 +380,16 @@ void loginUser(User* user) {
 }
 
 void showSeatingLayout(const User* user) {
+    const int TOTAL_WIDTH = 70; 
+    char title[100];
+    
     setColor(14);
-    printf("======================================================================\n");
-    printf("                  Seating arrangement for %s\n", user->currentMovie);
+    printf("======================================================================\n"); 
+    snprintf(title, sizeof(title), "Seating arrangement for %s", user->currentMovie);
+    int padding = (TOTAL_WIDTH - strlen(title)) / 2;
+    if (padding < 0) padding = 0;
+    printf("%*s%s\n", padding, "", title);
+    
     printf("======================================================================\n");
     setColor(15);
     printf("\n--------------------------------------------\n");
@@ -441,13 +455,10 @@ bool removeTicket(User* user, const char* seatLabel) {
     for (int i = 0; i < user->bookingCount; i++) {
         for (int j = 0; j < user->bookings[i].seatCount; j++) {
             if (strcmp(user->bookings[i].seats[j], seatLabel) == 0) {
-                // Remove the seat from the booking
                 for (int k = j; k < user->bookings[i].seatCount - 1; k++) {
                     strcpy(user->bookings[i].seats[k], user->bookings[i].seats[k+1]);
                 }
                 user->bookings[i].seatCount--;
-                
-                // If no seats left in booking, remove the booking
                 if (user->bookings[i].seatCount == 0) {
                     for (int k = i; k < user->bookingCount - 1; k++) {
                         user->bookings[k] = user->bookings[k+1];
@@ -709,8 +720,7 @@ void cancelTicketMenu(User* user) {
                     int seatIndex = seatLabelToIndex(selectedBooking->seats[j]);
                     user->bookedSeats[seatIndex] = false;
                 }
-                
-                // Remove the booking
+        
                 for (int j = bookingChoice - 1; j < user->bookingCount - 1; j++) {
                     user->bookings[j] = user->bookings[j+1];
                 }
@@ -718,7 +728,6 @@ void cancelTicketMenu(User* user) {
                 
                 saveSeatsForMovie(user->currentMovie, user->bookedSeats);
                 
-                // Rewrite all bookings to file
                 FILE* bookingFile = fopen("bookings.txt", "w");
                 if (bookingFile) {
                     for (int j = 0; j < user->bookingCount; j++) {
@@ -763,8 +772,6 @@ void cancelTicketMenu(User* user) {
                         if (strcmp(selectedBooking->seats[j], seatLabel) == 0) {
                             int seatIndex = seatLabelToIndex(seatLabel);
                             user->bookedSeats[seatIndex] = false;
-                            
-                            // Remove the seat from booking
                             for (int k = j; k < selectedBooking->seatCount - 1; k++) {
                                 strcpy(selectedBooking->seats[k], selectedBooking->seats[k+1]);
                             }
@@ -787,7 +794,6 @@ void cancelTicketMenu(User* user) {
                     printf("Some seats couldn't be canceled (may not belong to you).\n");
                 }
                 
-                // If no seats left in booking, remove it
                 if (selectedBooking->seatCount == 0) {
                     for (int j = bookingChoice - 1; j < user->bookingCount - 1; j++) {
                         user->bookings[j] = user->bookings[j+1];
@@ -797,7 +803,6 @@ void cancelTicketMenu(User* user) {
                 
                 saveSeatsForMovie(user->currentMovie, user->bookedSeats);
                 
-                // Rewrite all bookings to file
                 FILE* bookingFile = fopen("bookings.txt", "w");
                 if (bookingFile) {
                     for (int j = 0; j < user->bookingCount; j++) {
@@ -855,15 +860,12 @@ void processPayment(User* user) {
             case 2: paymentMethod = "Debit/Credit Card"; break;
             case 3: paymentMethod = "Online Payment"; break;
         }
-        
-        // Mark all unpaid bookings as paid
         for (int i = 0; i < user->bookingCount; i++) {
             if (!user->bookings[i].paid) {
                 user->bookings[i].paid = true;
             }
         }
-        
-        // Rewrite all bookings to file
+
         FILE* bookingFile = fopen("bookings.txt", "w");
         if (bookingFile) {
             for (int i = 0; i < user->bookingCount; i++) {
@@ -952,7 +954,6 @@ void processPayment(User* user) {
 void displayBill(User* user) {
     loadUserBookings(user);
     
-    // Remove empty bookings
     int validBookings = 0;
     for (int i = 0; i < user->bookingCount; i++) {
         if (user->bookings[i].seatCount > 0) {
@@ -969,8 +970,7 @@ void displayBill(User* user) {
         _getch();
         return;
     }
-    
-    // Check if all bookings are paid
+   
     bool allPaid = true;
     for (int i = 0; i < user->bookingCount; i++) {
         if (!user->bookings[i].paid) {
@@ -1064,7 +1064,6 @@ void displayBill(User* user) {
         _getch();
     }
     
-    // Check if there are paid bookings to show
     bool hasPaidBookings = false;
     for (int i = 0; i < user->bookingCount; i++) {
         if (user->bookings[i].paid) {
